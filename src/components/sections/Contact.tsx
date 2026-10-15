@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMagnetic } from "../../lib/useMagnetic";
 
 const SERVICES = ["Website", "Ads", "AI Property Video", "Not sure yet"];
-const CONTACT_EMAIL = "marichufx@gmail.com";
+const CONTACT_EMAIL = "hello@trovana-hub.com";
 
 type FormState = {
   name: string;
@@ -99,6 +99,8 @@ export default function Contact() {
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const magnetic = useMagnetic<HTMLButtonElement>(0.3);
 
   const validate = (field: keyof FormState, value: string): string | undefined => {
@@ -117,7 +119,7 @@ export default function Contact() {
   const onBlurField = (field: keyof FormState) => () =>
     setErrors((e) => ({ ...e, [field]: validate(field, form[field]) }));
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const nextErrors: FormErrors = {
       name: validate("name", form.name),
@@ -127,12 +129,24 @@ export default function Contact() {
     setErrors(nextErrors);
     if (Object.values(nextErrors).some(Boolean)) return;
 
-    const subject = encodeURIComponent(`New project inquiry — ${form.service}`);
-    const body = encodeURIComponent(
-      `Name: ${form.name}\nEmail: ${form.email}\nService: ${form.service}\n\n${form.details}`,
-    );
-    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Couldn't send your message. Please try again.");
+      }
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Couldn't send your message.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -182,8 +196,7 @@ export default function Contact() {
                 </motion.svg>
                 <p className="font-display text-xl font-semibold text-stone">Message sent.</p>
                 <p className="max-w-xs text-sm text-warmgrey">
-                  Your email app should have opened with the details pre-filled. We'll be in touch
-                  soon.
+                  We've received your message and will be in touch soon.
                 </p>
                 <button
                   type="button"
@@ -252,15 +265,29 @@ export default function Contact() {
                   textarea
                 />
 
+                <AnimatePresence>
+                  {submitError && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      className="text-sm text-ember"
+                    >
+                      {submitError}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+
                 <button
                   ref={magnetic.ref}
                   onPointerMove={magnetic.onPointerMove}
                   onPointerLeave={magnetic.onPointerLeave}
                   data-cursor="Go"
                   type="submit"
-                  className="mt-2 rounded-full bg-ember px-8 py-4 text-sm font-semibold text-charcoal transition-transform duration-300 hover:shadow-[0_0_30px_rgba(255,106,43,0.5)]"
+                  disabled={submitting}
+                  className="mt-2 rounded-full bg-ember px-8 py-4 text-sm font-semibold text-charcoal transition-transform duration-300 hover:shadow-[0_0_30px_rgba(255,106,43,0.5)] disabled:opacity-60"
                 >
-                  Send message
+                  {submitting ? "Sending…" : "Send message"}
                 </button>
               </motion.form>
             )}
