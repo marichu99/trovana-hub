@@ -66,9 +66,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         <p>${escapeHtml(details).replace(/\n/g, "<br />")}</p>
       `,
     });
-    return res.status(200).json({ ok: true });
   } catch (error) {
     console.error("Failed to send contact email", error);
     return res.status(502).json({ error: "Couldn't send your message. Please try again." });
   }
+
+  try {
+    const firstName = name.split(" ")[0];
+    await transporter.sendMail({
+      from: `"Trovana Hub" <${SMTP_USER}>`,
+      to: `"${name}" <${email}>`,
+      subject: "We've got your message — Trovana Hub",
+      text: `Hi ${firstName},\n\nThanks for reaching out to Trovana Hub about ${service}. We've received your message and someone from our team will be in touch within one business day.\n\nFor reference, here's what you sent us:\n\n${details}\n\nTalk soon,\nTrovana Hub\nWe build websites and demand.`,
+      html: `
+        <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1E1B19;">
+          <p style="font-size: 20px; font-weight: 700; margin-bottom: 4px;">
+            Trovana <span style="color:#FF6A2B;">Hub</span>
+          </p>
+          <p style="color: #8A8580; font-size: 13px; margin-top: 0;">We build websites and demand.</p>
+          <p>Hi ${escapeHtml(firstName)},</p>
+          <p>Thanks for reaching out about <strong>${escapeHtml(service)}</strong>. We've received your message and someone from our team will be in touch within one business day.</p>
+          <p style="color: #8A8580; font-size: 13px;">For reference, here's what you sent us:</p>
+          <blockquote style="border-left: 3px solid #FF6A2B; margin: 0; padding-left: 12px; color: #4A3326;">
+            ${escapeHtml(details).replace(/\n/g, "<br />")}
+          </blockquote>
+          <p>Talk soon,<br />Trovana Hub</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    // The studio was already notified above; a failed auto-reply shouldn't fail the whole request.
+    console.error("Failed to send auto-reply email", error);
+  }
+
+  return res.status(200).json({ ok: true });
 }
